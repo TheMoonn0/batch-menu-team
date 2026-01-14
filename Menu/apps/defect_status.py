@@ -9,7 +9,7 @@ from urllib3.util.retry import Retry
 # --- CONFIG ---
 JIRA_DOMAIN    = "scbjira.atlassian.net"
 JIRA_EMAIL     = "t_pattanaphon.onrodprai@scb.co.th"
-JIRA_API_TOKEN = "ATATT3xFfGF02t9xxsl-kce6l3cj19ZFX6bm1H7fTlVrjs67b1MzjOlHuq0fROrEUWZopFFxRNF5oOyL7QABOERjMK4Oko6szJXPRCCNmuVZDBLjfyJ6364zGtBRYg27PhhIhrkOFQyf3VEHgEz1SWFbAyC8CIA24zCHV_19tWV6r4A3t0J-vW8=E5AB51E8"
+JIRA_API_TOKEN = "ATATT3xFfGF0TMdYQTYPekw_WyC4kX0MZYVwQ9rAFVoTiyLjAHJyWRZkGAcvg3KsK8iE2G0fb7OXjyEYoTBcpxvo6LoptqPR80Sm13s4samajSnfbFwB6Z-nfCtdPeOWS5UVLBzPYZpO3jhpl05LKT2ytrIeNOSWOGz-5BlnUUrvtv4H-rajqkg=F4B9AA49"
 
 MAX_WORKERS = 20
 TIMEOUT = 30
@@ -97,3 +97,4 @@ def render():
             with col4:
                 st.markdown("**👤 Assignee**")
                 st.code("\n".join(final_assignees), language="text")
+
