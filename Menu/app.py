@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
+import time
 
 # Import apps
-from apps import gen_gl, gen_database, database, defect_status
+from apps import gen_gl, gen_database, database, defect_status, itmx_reconcile
 
 # ============================================================
 # PAGE CONFIG
 # ============================================================
 st.set_page_config(
     page_title="Menu",
-    page_icon="🏠",
+    page_icon="\U0001f3e0",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
@@ -461,34 +462,38 @@ st.markdown("""
 # SESSION STATE
 # ============================================================
 if 'current_page' not in st.session_state:
-    st.session_state.current_page = "🏠 Home"
+    st.session_state.current_page = "\U0001f3e0 Home"
 
 # ============================================================
 # SIDEBAR NAVIGATION
 # ============================================================
 with st.sidebar:
-    st.markdown("### 📋 เมนู")
+    st.markdown("### \U0001f4cb เมนู")
     
-    if st.button("🏠 Home", key="nav_home", use_container_width=True):
-        st.session_state.current_page = "🏠 Home"
+    if st.button("\U0001f3e0 Home", key="nav_home", use_container_width=True):
+        st.session_state.current_page = "\U0001f3e0 Home"
         st.rerun()
     
     st.markdown("---")
     
-    if st.button("📄 GEN File GL", key="nav_gl", use_container_width=True):
-        st.session_state.current_page = "📄 GEN File GL"
+    if st.button("\U0001f4c4 GEN File GL", key="nav_gl", use_container_width=True):
+        st.session_state.current_page = "\U0001f4c4 GEN File GL"
         st.rerun()
     
-    if st.button("💾 GEN File Database", key="nav_gendb", use_container_width=True):
-        st.session_state.current_page = "💾 GEN File Database"
+    if st.button("\U0001f4be GEN File Database", key="nav_gendb", use_container_width=True):
+        st.session_state.current_page = "\U0001f4be GEN File Database"
         st.rerun()
     
-    if st.button("🗄️ Database", key="nav_db", use_container_width=True):
-        st.session_state.current_page = "🗄️ Database"
+    if st.button("\U0001f5c4\ufe0f Database", key="nav_db", use_container_width=True):
+        st.session_state.current_page = "\U0001f5c4\ufe0f Database"
         st.rerun()
     
-    if st.button("🐛 Defect Status", key="nav_defect", use_container_width=True):
-        st.session_state.current_page = "🐛 Defect Status"
+    if st.button("\U0001f41b Defect Status", key="nav_defect", use_container_width=True):
+        st.session_state.current_page = "\U0001f41b Defect Status"
+        st.rerun()
+    
+    if st.button("\U0001f504 ITMX Reconcile", key="nav_itmx", use_container_width=True):
+        st.session_state.current_page = "\U0001f504 ITMX Reconcile"
         st.rerun()
 
 # ============================================================
@@ -497,7 +502,7 @@ with st.sidebar:
 def page_home():
     st.markdown("""
         <div class="home-header">
-            <span class="home-icon">🏠</span>
+            <span class="home-icon">\U0001f3e0</span>
             <h1 class="home-title">Home</h1>
             <p class="home-subtitle">เลือกเครื่องมือที่ต้องการใช้งาน</p>
         </div>
@@ -507,41 +512,50 @@ def page_home():
     col_spacer1, col1, col2, col_spacer2 = st.columns([0.5, 2, 2, 0.5])
     
     with col1:
-        if st.button("📄\n\n**GEN File GL**", key="card_gl", use_container_width=True):
-            st.session_state.current_page = "📄 GEN File GL"
+        if st.button("\U0001f4c4\n\n**GEN File GL**", key="card_gl", use_container_width=True):
+            st.session_state.current_page = "\U0001f4c4 GEN File GL"
             st.rerun()
         
         st.write("")
         
-        if st.button("🗄️\n\n**Database**", key="card_db", use_container_width=True):
-            st.session_state.current_page = "🗄️ Database"
+        if st.button("\U0001f5c4\ufe0f\n\n**Database**", key="card_db", use_container_width=True):
+            st.session_state.current_page = "\U0001f5c4\ufe0f Database"
+            st.rerun()
+        
+        st.write("")
+        
+        if st.button("\U0001f504\n\n**ITMX Reconcile**", key="card_itmx", use_container_width=True):
+            st.session_state.current_page = "\U0001f504 ITMX Reconcile"
             st.rerun()
     
     with col2:
-        if st.button("💾\n\n**GEN File Database**", key="card_gendb", use_container_width=True):
-            st.session_state.current_page = "💾 GEN File Database"
+        if st.button("\U0001f4be\n\n**GEN File Database**", key="card_gendb", use_container_width=True):
+            st.session_state.current_page = "\U0001f4be GEN File Database"
             st.rerun()
         
         st.write("")
         
-        if st.button("🐛\n\n**Defect Status**", key="card_defect", use_container_width=True):
-            st.session_state.current_page = "🐛 Defect Status"
+        if st.button("\U0001f41b\n\n**Defect Status**", key="card_defect", use_container_width=True):
+            st.session_state.current_page = "\U0001f41b Defect Status"
             st.rerun()
 
 # ============================================================
 # ROUTING
 # ============================================================
-if st.session_state.current_page == "🏠 Home":
+if st.session_state.current_page == "\U0001f3e0 Home":
     page_home()
-elif st.session_state.current_page == "📄 GEN File GL":
-    st.markdown('<div class="page-title">📄 GEN File GL</div>', unsafe_allow_html=True)
+elif st.session_state.current_page == "\U0001f4c4 GEN File GL":
+    st.markdown('<div class="page-title">\U0001f4c4 GEN File GL</div>', unsafe_allow_html=True)
     gen_gl.render()
-elif st.session_state.current_page == "💾 GEN File Database":
-    st.markdown('<div class="page-title">💾 GEN File Database</div>', unsafe_allow_html=True)
+elif st.session_state.current_page == "\U0001f4be GEN File Database":
+    st.markdown('<div class="page-title">\U0001f4be GEN File Database</div>', unsafe_allow_html=True)
     gen_database.render()
-elif st.session_state.current_page == "🗄️ Database":
-    st.markdown('<div class="page-title">🗄️ Database</div>', unsafe_allow_html=True)
+elif st.session_state.current_page == "\U0001f5c4\ufe0f Database":
+    st.markdown('<div class="page-title">\U0001f5c4\ufe0f Database</div>', unsafe_allow_html=True)
     database.render()
-elif st.session_state.current_page == "🐛 Defect Status":
-    st.markdown('<div class="page-title">🐛 Defect Status</div>', unsafe_allow_html=True)
+elif st.session_state.current_page == "\U0001f41b Defect Status":
+    st.markdown('<div class="page-title">\U0001f41b Defect Status</div>', unsafe_allow_html=True)
     defect_status.render()
+elif st.session_state.current_page == "\U0001f504 ITMX Reconcile":
+    st.markdown('<div class="page-title">\U0001f504 ITMX Reconcile</div>', unsafe_allow_html=True)
+    itmx_reconcile.render()
