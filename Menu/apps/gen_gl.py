@@ -17,7 +17,7 @@ DEFAULT_SOURCE_FOLDER_NAME = "CDM"
 # สร้าง absolute path ของ Data_GL โดยอ้างอิงจากตำแหน่ง gen_gl.py → Menu/Data_GL
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))        # .../Menu/apps
 _MENU_DIR = os.path.dirname(_SCRIPT_DIR)                         # .../Menu
-DEFAULT_TLF_FOLDER = os.path.join(_MENU_DIR, "Data_GL")
+DEFAULT_TLF_FOLDER = os.path.join(_MENU_DIR, "Data GL")
 
 tlf_reserved_rows = 2
 gl_reserved_rows = 10
