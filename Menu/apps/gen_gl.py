@@ -23,16 +23,17 @@ tlf_reserved_rows = 2
 gl_reserved_rows = 10
 gap_rows = 3
 
-exclude_tlf_columns = ['from_acct', 'to_acct', 'auth_branch_from']
 TLF_LABEL = "TLF or Database(ATMI)"
 
 gl_columns_letters = ['J', 'K', 'L', 'M', 'N', 'P', 'AM', 'AN', 'AZ']
 gl_base_headers = ['RC', 'OC', 'CH', 'Product Code', 'Account Code', 'Tax', 'DR', 'CR', 'Seq', 'Details']
 gl_new_headers = gl_base_headers
 
+# ✅ Updated: 25 columns ตรงกับ GL_EDIT - GPT.py
 tlf_columns_letters = [
-    'F', 'G', 'I', 'J', 'K', 'M', 'O', 'V',
-    'AF', 'AS', 'AT', 'AU', 'AV', 'AX', 'AZ', 'CU', 'DP', 'BH'
+    'F', 'I', 'G', 'J', 'K', 'L', 'M', 'O', 'V', 'W',
+    'AF', 'AS', 'AT', 'AU', 'AV', 'AX', 'AZ', 'CU', 'BH', 'BW',
+    'BX', 'DP', 'DQ', 'C', 'DU'
 ]
 
 # =========================
@@ -179,21 +180,22 @@ def pick_date_from_csv_col_c_bytes(file_bytes: bytes, nrows=20):
     return max(candidates, key=lambda x: int(x))
 
 # =========================
-# Indices / pos AZ CU (เหมือนเดิม)
+# Indices / pos AZ CU AF (ตรงกับ GL_EDIT - GPT.py)
 # =========================
 
 gl_indices = [excel_col_to_index(c) for c in gl_columns_letters]
 tlf_indices = [excel_col_to_index(c) for c in tlf_columns_letters]
 
+# ✅ Updated: ใช้ลำดับใน tlf_columns_letters โดยตรง (ไม่ sort)
 def get_col_pos_in_tlf(target_letter):
-    sorted_letters = sorted(tlf_columns_letters, key=lambda x: excel_col_to_index(x))
     try:
-        return sorted_letters.index(target_letter)
+        return tlf_columns_letters.index(target_letter)
     except:
         return -1
 
 pos_AZ = get_col_pos_in_tlf('AZ')
 pos_CU = get_col_pos_in_tlf('CU')
+pos_AF = get_col_pos_in_tlf('AF')
 
 # Styles (เหมือนเดิม)
 thin_border = Border(left=Side(style='thin'), right=Side(style='thin'),
@@ -312,6 +314,12 @@ def process_combined_data_from_zip(zip_bytes: bytes, source_folder_name: str, tl
 
                     if tlf_sheet_to_use:
                         tlf_df = pd.read_excel(tlf_book_to_use, sheet_name=tlf_sheet_to_use, usecols=tlf_indices, dtype=str)
+
+                        # ✅ Reorder columns ให้ตรงตามลำดับใน tlf_columns_letters
+                        sorted_tlf_indices = sorted(tlf_indices)
+                        reorder = [sorted_tlf_indices.index(idx) for idx in tlf_indices]
+                        tlf_df = tlf_df.iloc[:, reorder]
+
                         for col in tlf_df.columns:
                             tlf_df[col] = tlf_df[col].astype(str).str.strip()
 
@@ -320,8 +328,9 @@ def process_combined_data_from_zip(zip_bytes: bytes, source_folder_name: str, tl
                         if pos_CU != -1 and pos_CU < len(tlf_df.columns):
                             tlf_df.iloc[:, pos_CU] = tlf_df.iloc[:, pos_CU].apply(convert_implied_decimal)
 
-                        if not tlf_df.empty and len(tlf_df.columns) > 8:
-                            search_col = tlf_df.iloc[:, 8].astype(str).str.strip()
+                        # ✅ ใช้ pos_AF (Column AF) สำหรับ _SearchKey
+                        if not tlf_df.empty and pos_AF != -1 and pos_AF < len(tlf_df.columns):
+                            search_col = tlf_df.iloc[:, pos_AF].astype(str).str.strip()
                             tlf_df['_SearchKey'] = search_col + '|' + (tlf_df.groupby(search_col).cumcount() + 1).astype(str)
 
                             max_k_tlf = max_k_from_searchkey(tlf_df['_SearchKey'])
@@ -465,12 +474,8 @@ def process_combined_data_from_zip(zip_bytes: bytes, source_folder_name: str, tl
                         ws[f'A{report_row}'] = TLF_LABEL
                         ws[f'A{report_row}'].font = title_font
 
-                        display_cols = [c for c in tlf_df.columns if c != '_SearchKey' and c not in exclude_tlf_columns]
-
-                        if 'amt_1_full' in display_cols and 'resp_byte' in display_cols:
-                            idx1 = display_cols.index('amt_1_full')
-                            idx2 = display_cols.index('resp_byte')
-                            display_cols[idx1], display_cols[idx2] = display_cols[idx2], display_cols[idx1]
+                        # ✅ แสดงทุกคอลัมน์ (ไม่ exclude, ไม่ swap) ให้ตรงกับตาราง raw data
+                        display_cols = [c for c in tlf_df.columns if c != '_SearchKey']
 
                         current_col_idx = 1
                         tlf_key_range_str = f"${tlf_key_col_letter}${tlf_data_start}:${tlf_key_col_letter}${tlf_data_end}"
