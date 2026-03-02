@@ -631,12 +631,11 @@ def render():
     st.write("อัปโหลด ZIP ที่มีเฉพาะไฟล์ **.csv** (ไฟล์ TLF จะดึงจาก folder **Data_GL** แทน)")
 
     source_name = st.text_input("Source name (ใช้ตั้งชื่อไฟล์ output: GL_<source>.xlsx)", value=DEFAULT_SOURCE_FOLDER_NAME)
-    tlf_folder = st.text_input("📂 TLF Folder Path (folder ที่เก็บไฟล์ .xlsx TLF)", value=DEFAULT_TLF_FOLDER)
     uploaded = st.file_uploader("Upload ZIP (เฉพาะ .csv)", type=["zip"])
 
     if uploaded is not None:
         try:
-            out_bytes, out_name, logs = process_combined_data_from_zip(uploaded.getvalue(), source_name, tlf_folder)
+            out_bytes, out_name, logs = process_combined_data_from_zip(uploaded.getvalue(), source_name, DEFAULT_TLF_FOLDER)
 
             st.success("✅ ประมวลผลเสร็จสิ้น")
             st.download_button(
