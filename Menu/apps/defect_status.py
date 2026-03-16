@@ -1,99 +1,201 @@
 # -*- coding: utf-8 -*-
-import streamlit as st
 import base64
-import requests
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import requests
+import streamlit as st
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 # --- CONFIG ---
-JIRA_DOMAIN    = "scbjira.atlassian.net"
-JIRA_EMAIL     = "t_pattanaphon.onrodprai@scb.co.th"
-JIRA_API_TOKEN = "ATATT3xFfGF02t9xxsl-kce6l3cj19ZFX6bm1H7fTlVrjs67b1MzjOlHuq0fROrEUWZopFFxRNF5oOyL7QABOERjMK4Oko6szJXPRCCNmuVZDBLjfyJ6364zGtBRYg27PhhIhrkOFQyf3VEHgEz1SWFbAyC8CIA24zCHV_19tWV6r4A3t0J-vW8=E5AB51E8"
+JIRA_DOMAIN = "scbjira.atlassian.net"
+JIRA_EMAIL = "t_pattanaphon.onrodprai@scb.co.th"
 
+# --- PERFORMANCE TUNING ---
 MAX_WORKERS = 20
 TIMEOUT = 30
 
+# --- SESSION SETUP ---
 sess = requests.Session()
-retry = Retry(total=3, backoff_factor=1, status_forcelist=(429, 500, 502, 503, 504), allowed_methods=["GET"])
-adapter = HTTPAdapter(max_retries=retry, pool_connections=50, pool_maxsize=50)
+retry = Retry(
+    total=3,
+    backoff_factor=1,
+    status_forcelist=(429, 500, 502, 503, 504),
+    allowed_methods=["GET"],
+)
+adapter = HTTPAdapter(
+    max_retries=retry,
+    pool_connections=50,
+    pool_maxsize=50,
+)
 sess.mount("https://", adapter)
 
+
+def _get_jira_api_token():
+    token = os.getenv("JIRA_API_TOKEN", "").strip()
+    if token:
+        return token
+
+    try:
+        secret_token = str(st.secrets.get("JIRA_API_TOKEN", "")).strip()
+        if secret_token:
+            return secret_token
+
+        jira_config = st.secrets.get("jira", {})
+        if jira_config:
+            return str(jira_config.get("api_token", "")).strip()
+    except Exception:
+        return ""
+
+    return ""
+
+
 def _jira_headers():
-    tok = base64.b64encode(f"{JIRA_EMAIL}:{JIRA_API_TOKEN}".encode()).decode()
-    return {"Authorization": f"Basic {tok}", "Accept": "application/json"}
+    token = _get_jira_api_token()
+    encoded_token = base64.b64encode(f"{JIRA_EMAIL}:{token}".encode()).decode()
+    return {
+        "Authorization": f"Basic {encoded_token}",
+        "Accept": "application/json",
+    }
+
 
 def fetch_single_issue_data(key):
     key = key.strip()
+
     if not key:
         return None, None, None, None
+
     url = f"https://{JIRA_DOMAIN}/rest/api/3/issue/{key}"
+
     try:
-        r = sess.get(url, headers=_jira_headers(), params={"fields": "status,summary,assignee"}, timeout=TIMEOUT)
-        if r.status_code == 200:
-            fields = r.json().get("fields", {})
-            status = fields.get("status", {}).get("name", "Unknown")
+        response = sess.get(
+            url,
+            headers=_jira_headers(),
+            params={
+                "fields": "summary,status",
+                "expand": "changelog",
+            },
+            timeout=TIMEOUT,
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            fields = data.get("fields", {})
+
             summary = fields.get("summary", "")
-            assignee_obj = fields.get("assignee")
-            assignee = assignee_obj.get("displayName") or assignee_obj.get("emailAddress") or "Assigned" if assignee_obj else "Unassigned"
-            return key, status, summary, assignee
-        elif r.status_code == 404:
-            return key, "Not Found", "Not Found", "Not Found"
-        else:
-            return key, f"Error {r.status_code}", f"Error {r.status_code}", f"Error {r.status_code}"
+            status = fields.get("status", {}).get("name", "Unknown")
+
+            histories = data.get("changelog", {}).get("histories", [])
+            reopen_count = 0
+
+            for history in histories:
+                for item in history.get("items", []):
+                    if (item.get("field") or "").lower() == "status":
+                        to_status = (item.get("toString") or "").strip().lower()
+                        if to_status == "reopened":
+                            reopen_count += 1
+
+            return key, summary, status, reopen_count
+
+        if response.status_code == 404:
+            return key, "Not Found", "Not Found", 0
+
+        error = f"Error {response.status_code}"
+        return key, error, error, 0
+
     except Exception:
-        return key, "Error", "Error", "Error"
+        return key, "Error", "Error", 0
 
 
 def render():
-    """Render Defect Status page"""
-    
-    if "YOUR_JIRA" in JIRA_API_TOKEN or JIRA_API_TOKEN.strip() == "":
-        st.error("⛔ กรุณาใส่ JIRA_API_TOKEN ใน Code ก่อนครับ")
+    """Render Defect Status page."""
+
+    st.markdown("### Jira Status + Reopen Counter")
+
+    jira_api_token = _get_jira_api_token()
+    if not jira_api_token:
+        st.error("Set JIRA_API_TOKEN in Streamlit secrets or environment before running.")
         return
-    
-    input_keys = st.text_area(
-        "Issue Keys",
-        height=120,
-        placeholder="วาง Issue Key ที่นี่ (หนึ่ง Key ต่อบรรทัด)...",
-        label_visibility="collapsed"
-    )
-    
-    if st.button("🚀 ตรวจสอบ", type="primary"):
-        keys = [k.strip() for k in input_keys.split('\n') if k.strip()]
-        
-        if not keys:
-            st.warning("⚠️ กรุณาใส่ Issue Key ก่อนครับ")
-        else:
-            results_map = {}
-            with st.spinner("กำลังดึงข้อมูล..."):
-                with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-                    future_to_key = {executor.submit(fetch_single_issue_data, key): key for key in keys}
-                    for future in as_completed(future_to_key):
-                        key, status, summary, assignee = future.result()
-                        if key:
-                            results_map[key] = {"status": status, "summary": summary, "assignee": assignee}
-            
-            final_keys, final_statuses, final_summaries, final_assignees = [], [], [], []
-            for k in keys:
-                final_keys.append(k)
-                data = results_map.get(k, {"status": "Error", "summary": "Error", "assignee": "Error"})
-                final_statuses.append(data["status"])
-                final_summaries.append(data["summary"])
-                final_assignees.append(data["assignee"])
-            
-            st.markdown(f"### 📊 ผลลัพธ์ ({len(keys)} รายการ)")
-            
-            col1, col2, col3, col4 = st.columns([1, 3, 1, 1.5])
-            with col1:
-                st.markdown("**🔑 Key**")
-                st.code("\n".join(final_keys), language="text")
-            with col2:
-                st.markdown("**📝 Summary**")
-                st.code("\n".join(final_summaries), language="text")
-            with col3:
-                st.markdown("**📌 Status**")
-                st.code("\n".join(final_statuses), language="text")
-            with col4:
-                st.markdown("**👤 Assignee**")
-                st.code("\n".join(final_assignees), language="text")
+
+    c_input, c_btn = st.columns([3, 1], vertical_alignment="bottom")
+
+    with c_input:
+        input_keys = st.text_area(
+            "Input",
+            value="",
+            height=150,
+            label_visibility="collapsed",
+            placeholder="Paste issue keys here, one per line...",
+        )
+
+    with c_btn:
+        run_btn = st.button(
+            "Check",
+            use_container_width=True,
+            type="primary",
+        )
+
+    if not run_btn:
+        return
+
+    keys = [key.strip() for key in input_keys.split("\n") if key.strip()]
+
+    if not keys:
+        st.warning("Enter at least one issue key.")
+        return
+
+    results_map = {}
+
+    with st.spinner("Fetching Jira data..."):
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            future_to_key = {
+                executor.submit(fetch_single_issue_data, key): key
+                for key in keys
+            }
+
+            for future in as_completed(future_to_key):
+                key, summary, status, reopen_count = future.result()
+
+                if key:
+                    results_map[key] = {
+                        "summary": summary,
+                        "status": status,
+                        "reopen_count": reopen_count,
+                    }
+
+    final_keys = []
+    final_summaries = []
+    final_statuses = []
+    final_reopen_counts = []
+
+    for key in keys:
+        data = results_map.get(
+            key,
+            {"summary": "Error", "status": "Error", "reopen_count": 0},
+        )
+
+        final_keys.append(key)
+        final_summaries.append(data["summary"])
+        final_statuses.append(data["status"])
+        final_reopen_counts.append(str(data["reopen_count"]))
+
+    st.divider()
+
+    col1, col2, col3, col4 = st.columns([1, 4, 1, 1])
+
+    with col1:
+        st.caption("Keys")
+        st.code("\n".join(final_keys), language="text")
+
+    with col2:
+        st.caption("Summary")
+        st.code("\n".join(final_summaries), language="text")
+
+    with col3:
+        st.caption("Status")
+        st.code("\n".join(final_statuses), language="text")
+
+    with col4:
+        st.caption("Reopen")
+        st.code("\n".join(final_reopen_counts), language="text")
