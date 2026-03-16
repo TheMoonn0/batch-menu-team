@@ -39,6 +39,7 @@ HELPER_COLUMN_NAMES = {"_SearchKey", "_SearchKeyTime"}
 SEARCH_FIXED_WIDTHS = {TLF_TIME_HEADER: 16, "Details": 12}
 SEARCH_HEADER_LABELS = {"DR": "   DR", "CR": "   CR", "Details": "          Details"}
 SEARCH_WIDTH_LIMITS = (10, 24)
+GL_SORT_COLUMNS = ["RC", "CH", "OC", "Product Code"]
 
 gl_columns_letters = ["J", "K", "L", "M", "N", "P", "AM", "AN", "AZ"]
 gl_base_headers = ["RC", "OC", "CH", "Product Code", "Account Code", "Tax", "DR", "CR", "Seq", "Details"]
@@ -364,8 +365,8 @@ def prepare_gl_dataframe(file_path):
 
     gl_df = gl_df[gl_base_headers]
     gl_df = gl_df.sort_values(
-        by=["CH", "RC", "OC", "Product Code"],
-        ascending=[True, True, True, True],
+        by=GL_SORT_COLUMNS,
+        ascending=[True] * len(GL_SORT_COLUMNS),
     )
 
     if not gl_df.empty:
@@ -1138,8 +1139,8 @@ def prepare_gl_dataframe_from_bytes(file_bytes: bytes, filename_for_error: str):
 
     gl_df = gl_df[gl_base_headers]
     gl_df = gl_df.sort_values(
-        by=["CH", "RC", "OC", "Product Code"],
-        ascending=[True, True, True, True],
+        by=GL_SORT_COLUMNS,
+        ascending=[True] * len(GL_SORT_COLUMNS),
     )
 
     if not gl_df.empty:
