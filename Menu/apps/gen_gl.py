@@ -151,13 +151,9 @@ def max_k_from_searchkey(series: pd.Series) -> int:
     return max_k
 
 
-def detect_term_type_from_zip_name(zip_filename: str):
-    upper_name = (zip_filename or "").upper()
-    if "ATM" in upper_name:
-        return "ATM", TERM_TYPE_FILTERS["ATM"]
-    if "CDM" in upper_name:
-        return "CDM", TERM_TYPE_FILTERS["CDM"]
-    return None, None
+def get_term_type_from_source_name(source_name: str):
+    normalized_source_name = (source_name or "").strip().upper()
+    return normalized_source_name, TERM_TYPE_FILTERS.get(normalized_source_name)
 
 
 def to_yymmdd(value):
@@ -1246,7 +1242,6 @@ def process_combined_data_from_zip(
     zip_bytes: bytes,
     source_folder_name: str,
     tlf_folder_path: str = DEFAULT_TLF_FOLDER,
-    zip_filename: str = "",
 ):
     output_filename = f"GL_{source_folder_name}.xlsx"
     log_lines = []
@@ -1267,18 +1262,17 @@ def process_combined_data_from_zip(
         csv_bytes_map = {filename: zf.read(filename) for filename in csv_files}
         chosen_dates = {filename: pick_date_from_csv_col_c_bytes(file_bytes, nrows=20) for filename, file_bytes in csv_bytes_map.items()}
 
-    detected_source_type, tlf_filter_val = detect_term_type_from_zip_name(zip_filename)
+    selected_source_type, tlf_filter_val = get_term_type_from_source_name(source_folder_name)
 
     log("กำลังประมวลผล... (ZIP workflow + Excel format แบบ ex.py)")
     log(f"Source folder: {source_folder_name}")
-    log(f"ZIP filename: {zip_filename or '(unknown)'}")
     log(f"TLF folder: {tlf_folder_path}")
     log(f"TLF files: {[filename for filename, _ in tlf_books]}")
     log(f"CSV files: {csv_files}")
-    if detected_source_type:
-        log(f"Detected source type from ZIP filename: {detected_source_type} -> TERM TYPE {tlf_filter_val}")
+    if selected_source_type and tlf_filter_val:
+        log(f"Selected source type: {selected_source_type} -> TERM TYPE {tlf_filter_val}")
     else:
-        log("Detected source type from ZIP filename: none -> ไม่กรอง TERM TYPE")
+        log("Selected source type: none -> ไม่กรอง TERM TYPE")
     log("-" * 30)
     log("ไฟล์ที่จะประมวลผล (หา date จาก Column C1-C20 แยกไฟล์):")
     for filename in csv_files:
@@ -1325,7 +1319,11 @@ def process_combined_data_from_zip(
 def render():
     st.write("อัปโหลด ZIP ที่มีเฉพาะไฟล์ **.csv** และระบบจะดึงไฟล์ TLF จาก folder **Data GL** ให้อัตโนมัติ")
 
-    source_name = st.text_input("Source name (ใช้ตั้งชื่อไฟล์ output: GL_<source>.xlsx)", value=DEFAULT_SOURCE_FOLDER_NAME)
+    source_name = st.selectbox(
+        "Source name (ระบุเพื่อแบ่งข้อมูล ATM/CDM และใช้ตั้งชื่อไฟล์ output: GL_<source>.xlsx)",
+        options=["ATM", "CDM"],
+        index=1 if DEFAULT_SOURCE_FOLDER_NAME == "CDM" else 0,
+    )
     uploaded = st.file_uploader("Upload ZIP (เฉพาะ .csv)", type=["zip"])
 
     if uploaded is not None:
@@ -1334,7 +1332,6 @@ def render():
                 uploaded.getvalue(),
                 source_name,
                 DEFAULT_TLF_FOLDER,
-                uploaded.name,
             )
 
             st.success("✅ ประมวลผลเสร็จสิ้น")
