@@ -151,6 +151,15 @@ def max_k_from_searchkey(series: pd.Series) -> int:
     return max_k
 
 
+def detect_term_type_from_zip_name(zip_filename: str):
+    upper_name = (zip_filename or "").upper()
+    if "ATM" in upper_name:
+        return "ATM", TERM_TYPE_FILTERS["ATM"]
+    if "CDM" in upper_name:
+        return "CDM", TERM_TYPE_FILTERS["CDM"]
+    return None, None
+
+
 def to_yymmdd(value):
     if value is None:
         return None
@@ -1233,7 +1242,12 @@ def process_file_from_zip(writer, tlf_books, filename, file_bytes, chosen_date, 
     }
 
 
-def process_combined_data_from_zip(zip_bytes: bytes, source_folder_name: str, tlf_folder_path: str = DEFAULT_TLF_FOLDER):
+def process_combined_data_from_zip(
+    zip_bytes: bytes,
+    source_folder_name: str,
+    tlf_folder_path: str = DEFAULT_TLF_FOLDER,
+    zip_filename: str = "",
+):
     output_filename = f"GL_{source_folder_name}.xlsx"
     log_lines = []
 
@@ -1253,19 +1267,23 @@ def process_combined_data_from_zip(zip_bytes: bytes, source_folder_name: str, tl
         csv_bytes_map = {filename: zf.read(filename) for filename in csv_files}
         chosen_dates = {filename: pick_date_from_csv_col_c_bytes(file_bytes, nrows=20) for filename, file_bytes in csv_bytes_map.items()}
 
+    detected_source_type, tlf_filter_val = detect_term_type_from_zip_name(zip_filename)
+
     log("กำลังประมวลผล... (ZIP workflow + Excel format แบบ ex.py)")
     log(f"Source folder: {source_folder_name}")
+    log(f"ZIP filename: {zip_filename or '(unknown)'}")
     log(f"TLF folder: {tlf_folder_path}")
     log(f"TLF files: {[filename for filename, _ in tlf_books]}")
     log(f"CSV files: {csv_files}")
+    if detected_source_type:
+        log(f"Detected source type from ZIP filename: {detected_source_type} -> TERM TYPE {tlf_filter_val}")
+    else:
+        log("Detected source type from ZIP filename: none -> ไม่กรอง TERM TYPE")
     log("-" * 30)
     log("ไฟล์ที่จะประมวลผล (หา date จาก Column C1-C20 แยกไฟล์):")
     for filename in csv_files:
         log(f" - {filename} | chosen_date(YYMMDD)={chosen_dates[filename]}")
     log("-" * 30)
-
-    source_upper = os.path.basename(os.path.normpath(source_folder_name)).upper()
-    tlf_filter_val = TERM_TYPE_FILTERS.get(source_upper)
 
     out = io.BytesIO()
     with pd.ExcelWriter(out, engine="openpyxl") as writer:
@@ -1316,6 +1334,7 @@ def render():
                 uploaded.getvalue(),
                 source_name,
                 DEFAULT_TLF_FOLDER,
+                uploaded.name,
             )
 
             st.success("✅ ประมวลผลเสร็จสิ้น")
