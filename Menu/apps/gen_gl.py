@@ -277,8 +277,8 @@ def read_gl_csv(file_path, gl_indices):
 
 def normalize_string_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     for column in df.columns:
-        stripped = df[column].astype(str).str.strip()
-        df[column] = stripped.apply(lambda value: "" if value.lower() in ("nan", "none") else value)
+        cleaned = df[column].apply(lambda value: "" if pd.isna(value) else str(value).strip())
+        df[column] = cleaned.apply(lambda value: "" if value.lower() in ("nan", "none", "<na>") else value)
     return df
 
 
@@ -874,6 +874,34 @@ def create_search_sheet(writer, date_sheets_info):
     ws.column_dimensions["BA"].hidden = True
 
 
+def ensure_placeholder_sheet(writer, title: str = "Sheet"):
+    if title in writer.book.sheetnames:
+        return writer.book[title]
+
+    ws = writer.book.create_sheet(title)
+    writer.sheets[title] = ws
+    return ws
+
+
+def finalize_output_workbook(writer, date_sheets_info):
+    create_search_sheet(writer, date_sheets_info)
+
+    if "Search" in writer.book.sheetnames:
+        search_sheet = writer.book["Search"]
+        writer.book._sheets.remove(search_sheet)
+        writer.book._sheets.insert(0, search_sheet)
+
+    if "Sheet" in writer.book.sheetnames and len(writer.book.sheetnames) > 1:
+        del writer.book["Sheet"]
+
+
+def build_processing_failure(log_lines, prefix: str):
+    first_file_error = next((line for line in log_lines if line.startswith("X Error ไฟล์ ")), None)
+    if first_file_error:
+        return f"{prefix}: {first_file_error}"
+    return prefix
+
+
 def load_tlf_books():
     books = []
     for filename in tlf_filenames:
@@ -1016,6 +1044,7 @@ def process_combined_data():
     tlf_filter_val = TERM_TYPE_FILTERS.get(folder_upper)
 
     with pd.ExcelWriter(output_filename, engine="openpyxl") as writer:
+        ensure_placeholder_sheet(writer)
         date_sheets_info = []
         for file_path in csv_files:
             try:
@@ -1036,15 +1065,11 @@ def process_combined_data():
 
                 traceback.print_exc()
 
-        create_search_sheet(writer, date_sheets_info)
+        finalize_output_workbook(writer, date_sheets_info)
 
-        if "Search" in writer.book.sheetnames:
-            search_sheet = writer.book["Search"]
-            writer.book._sheets.remove(search_sheet)
-            writer.book._sheets.insert(0, search_sheet)
-
-        if "Sheet" in writer.book.sheetnames and len(writer.book.sheetnames) > 1:
-            del writer.book["Sheet"]
+        if not date_sheets_info:
+            writer.book["Sheet"]["A1"] = "No output generated."
+            raise RuntimeError("ไม่สามารถประมวลผลไฟล์ใดได้เลย กรุณาตรวจสอบไฟล์ CSV/TLF และ log ด้านบน")
 
     print("-" * 30)
     print(f"บันทึกไฟล์เรียบร้อยที่: {output_filename}")
@@ -1282,6 +1307,7 @@ def process_combined_data_from_zip(
 
     out = io.BytesIO()
     with pd.ExcelWriter(out, engine="openpyxl") as writer:
+        ensure_placeholder_sheet(writer)
         date_sheets_info = []
         for filename in csv_files:
             try:
@@ -1300,15 +1326,16 @@ def process_combined_data_from_zip(
                 log(f"X Error ไฟล์ {filename}: {exc}")
                 log(traceback.format_exc())
 
-        create_search_sheet(writer, date_sheets_info)
+        finalize_output_workbook(writer, date_sheets_info)
 
-        if "Search" in writer.book.sheetnames:
-            search_sheet = writer.book["Search"]
-            writer.book._sheets.remove(search_sheet)
-            writer.book._sheets.insert(0, search_sheet)
-
-        if "Sheet" in writer.book.sheetnames and len(writer.book.sheetnames) > 1:
-            del writer.book["Sheet"]
+        if not date_sheets_info:
+            writer.book["Sheet"]["A1"] = "No output generated."
+            raise RuntimeError(
+                build_processing_failure(
+                    log_lines,
+                    "ไม่สามารถประมวลผลไฟล์ใน ZIP ได้เลย กรุณาตรวจสอบรูปแบบข้อมูล",
+                )
+            )
 
     out.seek(0)
     log("-" * 30)
